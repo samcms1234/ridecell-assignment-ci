@@ -4,38 +4,42 @@ on:
   push:
     branches:
       - master
+    tags:
+      - '*'
+    paths:
+      - '**'
   pull_request:
     branches:
       - master
   workflow_dispatch:
-  push:
-    tags:
-      - '*'
-  push:
-    paths:
-      - '**'
-      - '*/**'
 
 jobs:
   build:
-    if: github.event.pull_request.merged == true || contains(github.event.head_commit.message, 'BUILD_CONTAINER_IMAGE')
+    if: |
+      github.event_name == 'push' && contains(github.event.head_commit.message, 'BUILD_CONTAINER_IMAGE') ||
+      github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged
     runs-on: ubuntu-latest
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v1
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and push
-      uses: docker/build-push-action@v2
-      with:
-        context: .
-        push: true
-        tags: saumyasrivastava2001/guestbook-go:latest
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/guestbook-go:latest
+
+      - name: Logout from DockerHub
+        run: docker logout
